@@ -12,6 +12,7 @@ import dev.jordond.compass.Azimuth
 import dev.jordond.compass.Coordinates
 import dev.jordond.compass.Priority
 import dev.jordond.compass.Speed
+import java.io.IOException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import dev.jordond.compass.geolocation.LocationRequest as CompassLocationRequest
@@ -24,7 +25,17 @@ internal suspend fun Location.toModel(context: Context): dev.jordond.compass.Loc
     // collectors of the SharedFlow invoke toModel on the same Location instance.
     val location = Location(this)
     return withContext(Dispatchers.IO) {
-        addMslAltitudeToLocation(context, location)
+        if (location.hasAltitude()) {
+            try {
+                addMslAltitudeToLocation(context, location)
+            } catch (_: IOException) {
+                // Geoid model data could not be loaded from raw assets.
+                // MSL altitude fields will be null, but lat/lng remain valid.
+            } catch (_: IllegalArgumentException) {
+                // Latitude, longitude, or altitude values were out of valid range.
+                // MSL altitude fields will be null, but lat/lng remain valid.
+            }
+        }
 
         dev.jordond.compass.Location(
             coordinates =
